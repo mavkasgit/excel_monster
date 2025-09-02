@@ -28,7 +28,6 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
     Set wsPlan = ThisWorkbook.Sheets(PLAN_SHEET)
     
     ' --- Проверка и создание листа "Подвесы" ---
-    Static hasShownSheetExistsMsg As Boolean
     On Error Resume Next
     Set wsPodvesy = ThisWorkbook.Sheets(PODVESY_SHEET)
     On Error GoTo 0
@@ -37,31 +36,25 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
         Set wsPodvesy = ThisWorkbook.Sheets.Add(After:=wsPlan)
         wsPodvesy.Name = PODVESY_SHEET
         With wsPodvesy
-            .Cells(1, 4).Value = "Дата"
-            .Cells(1, 5).Value = "№ по порядку"
-            .Cells(1, 6).Value = "Время"
-            .Cells(1, 7).Value = "Смена"
-            .Cells(1, 8).Value = "Вид материалов"
-            .Cells(1, 9).Value = "Годность подвеса"
-            .Cells(1, 10).Value = "Ответственный менеджер"
-            .Cells(1, 11).Value = "НОМЕР КПЗ"
-            .Cells(1, 12).Value = "Заказчик"
-            .Cells(1, 13).Value = "Профиль"
-            .Cells(1, 14).Value = "Тип завески"
-            .Cells(1, 15).Value = "Вид обработки"
-            .Cells(1, 16).Value = "Толщина мкм"
-            .Cells(1, 17).Value = "Цвет"
-            .Cells(1, 18).Value = "Подвесы, шт"
-            .Cells(1, 19).Value = "УСЛОВНЫЕ ПОДВЕСЫ, шт"
-            .Cells(1, 20).Value = "Ламели, шт"
+            .Cells(1, 4).value = "Дата"
+            .Cells(1, 5).value = "№ по порядку"
+            .Cells(1, 6).value = "Время"
+            .Cells(1, 7).value = "Смена"
+            .Cells(1, 8).value = "Вид материалов"
+            .Cells(1, 9).value = "Годность подвеса"
+            .Cells(1, 10).value = "Ответственный менеджер"
+            .Cells(1, 11).value = "НОМЕР КПЗ"
+            .Cells(1, 12).value = "Заказчик"
+            .Cells(1, 13).value = "Профиль"
+            .Cells(1, 14).value = "Тип завески"
+            .Cells(1, 15).value = "Вид обработки"
+            .Cells(1, 16).value = "Толщина мкм"
+            .Cells(1, 17).value = "Цвет"
+            .Cells(1, 18).value = "Подвесы, шт"
+            .Cells(1, 19).value = "УСЛОВНЫЕ ПОДВЕСЫ, шт"
+            .Cells(1, 20).value = "Ламели, шт"
             .Range("D1:T1").Font.Bold = True
         End With
-        hasShownSheetExistsMsg = True
-    Else
-        If Not hasShownSheetExistsMsg Then
-            MsgBox "Лист '" & PODVESY_SHEET & "' уже существует. Работаем с ним.", vbInformation
-            hasShownSheetExistsMsg = True
-        End If
     End If
 
     Set tblPlan = wsPlan.ListObjects(PLAN_TABLE)
@@ -76,11 +69,11 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
 
     ' --- 1. Обновление данных в таблице "План" ---
     taskIsNowComplete = False
-    currentPlanned = targetRow.Range.Cells(1, 1).Value
+    currentPlanned = targetRow.Range.Cells(1, 1).value
 
     If CStr(currentPlanned) <> "*" Then
         
-        Dim cellValue As String: cellValue = CStr(targetRow.Range.Cells(1, 3).Value)
+        Dim cellValue As String: cellValue = CStr(targetRow.Range.Cells(1, 3).value)
         Dim currentCompleted As Long
         Dim textPart As String
         Dim parenPos As Integer
@@ -101,15 +94,15 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
 
         If newCompleted >= CLng(currentPlanned) Then
             ' Задача ЗАВЕРШЕНА
-            targetRow.Range.Cells(1, 3).Value = newCompleted & " (" & Format(Now, "hh:mm dd.mm.yy") & ")"
+            targetRow.Range.Cells(1, 3).value = newCompleted & " (" & Format(Now, "hh:mm dd.mm.yy") & ")"
             taskIsNowComplete = True
         Else
             ' Задача В РАБОТЕ
             If textPart = "" Then
                 ' Первый запуск, ПЕРЕМЕЩАЕМ ВВЕРХ (под клюшки)
                 tempValue = newCompleted & " (" & Format(Now, "hh:mm dd.mm.yy") & ")"
-                targetRow.Range.Cells(1, 3).Value = tempValue
-                rowData = targetRow.Range.Value
+                targetRow.Range.Cells(1, 3).value = tempValue
+                rowData = targetRow.Range.value
                 
                 targetRow.Delete
 
@@ -119,10 +112,10 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
                 
                 For i = 1 To tblPlan.ListRows.Count
                     Dim isKlyushka As Boolean
-                    isKlyushka = (tblPlan.ListRows(i).Range.Cells(1, 4).Value = "Клюшки (растрав)")
+                    isKlyushka = (tblPlan.ListRows(i).Range.Cells(1, 4).value = "Клюшки (растрав)")
                     
                     Dim isInProgress As Boolean
-                    isInProgress = (tblPlan.ListRows(i).Range.Interior.Color = RGB(173, 216, 230))
+                    isInProgress = (tblPlan.ListRows(i).Range.Interior.color = RGB(173, 216, 230))
                     
                     If isKlyushka Or isInProgress Then
                         insertionIndex = i + 1
@@ -130,14 +123,14 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
                 Next i
                 
                 Set newRow = tblPlan.ListRows.Add(insertionIndex)
-                newRow.Range.Value = rowData
-                newRow.Range.Interior.Color = RGB(173, 216, 230)
+                newRow.Range.value = rowData
+                newRow.Range.Interior.color = RGB(173, 216, 230)
                 
                 Set targetRow = newRow
             Else
                 ' Уже в работе
-                targetRow.Range.Cells(1, 3).Value = newCompleted & " " & textPart
-                targetRow.Range.Interior.Color = RGB(173, 216, 230)
+                targetRow.Range.Cells(1, 3).value = newCompleted & " " & textPart
+                targetRow.Range.Interior.color = RGB(173, 216, 230)
             End If
         End If
     End If
@@ -160,41 +153,43 @@ SkipUpdate:
     If lastPodvesyRow < 2 Then
         sequenceNumber = 1
     Else
-        If currentShift = CStr(wsPodvesy.Cells(lastPodvesyRow, 7).Value) Then
-            sequenceNumber = wsPodvesy.Cells(lastPodvesyRow, 5).Value + 1
+        If currentShift = CStr(wsPodvesy.Cells(lastPodvesyRow, 7).value) Then
+            sequenceNumber = wsPodvesy.Cells(lastPodvesyRow, 5).value + 1
         Else
             sequenceNumber = 1
         End If
     End If
 
     With wsPodvesy
-        .Cells(newPodvesyRow, 4).Value = Date
-        .Cells(newPodvesyRow, 5).Value = sequenceNumber
-        .Cells(newPodvesyRow, 6).Value = Time
-        .Cells(newPodvesyRow, 7).Value = currentShift
-        .Cells(newPodvesyRow, 8).Value = targetRow.Range.Cells(1, 4).Value
-        .Cells(newPodvesyRow, 9).Value = targetRow.Range.Cells(1, 5).Value
-        .Cells(newPodvesyRow, 10).Value = targetRow.Range.Cells(1, 6).Value
-        .Cells(newPodvesyRow, 11).Value = targetRow.Range.Cells(1, 7).Value
-        .Cells(newPodvesyRow, 12).Value = targetRow.Range.Cells(1, 8).Value
-        .Cells(newPodvesyRow, 13).Value = targetRow.Range.Cells(1, 9).Value
-        .Cells(newPodvesyRow, 14).Value = targetRow.Range.Cells(1, 10).Value
-        .Cells(newPodvesyRow, 15).Value = targetRow.Range.Cells(1, 11).Value
-        .Cells(newPodvesyRow, 16).Value = targetRow.Range.Cells(1, 12).Value
-        .Cells(newPodvesyRow, 17).Value = targetRow.Range.Cells(1, 13).Value
-        .Cells(newPodvesyRow, 19).Value = targetRow.Range.Cells(1, 15).Value
-        .Cells(newPodvesyRow, 20).Value = targetRow.Range.Cells(1, 16).Value
-        .Cells(newPodvesyRow, 18).Value = quantity
+        .Cells(newPodvesyRow, 4).value = Date
+        .Cells(newPodvesyRow, 5).value = sequenceNumber
+        If Form1.chkRecordTime.value = True Then
+            .Cells(newPodvesyRow, 6).value = Format(Time, "hh:mm")
+        End If
+        .Cells(newPodvesyRow, 7).value = currentShift
+        .Cells(newPodvesyRow, 8).value = targetRow.Range.Cells(1, 4).value
+        .Cells(newPodvesyRow, 9).value = targetRow.Range.Cells(1, 5).value
+        .Cells(newPodvesyRow, 10).value = targetRow.Range.Cells(1, 6).value
+        .Cells(newPodvesyRow, 11).value = targetRow.Range.Cells(1, 7).value
+        .Cells(newPodvesyRow, 12).value = targetRow.Range.Cells(1, 8).value
+        .Cells(newPodvesyRow, 13).value = targetRow.Range.Cells(1, 9).value
+        .Cells(newPodvesyRow, 14).value = targetRow.Range.Cells(1, 10).value
+        .Cells(newPodvesyRow, 15).value = targetRow.Range.Cells(1, 11).value
+        .Cells(newPodvesyRow, 16).value = targetRow.Range.Cells(1, 12).value
+        .Cells(newPodvesyRow, 17).value = targetRow.Range.Cells(1, 13).value
+        .Cells(newPodvesyRow, 19).value = targetRow.Range.Cells(1, 15).value
+        .Cells(newPodvesyRow, 20).value = targetRow.Range.Cells(1, 16).value
+        .Cells(newPodvesyRow, 18).value = quantity
     End With
 
     ' --- 3. Перемещение выполненной задачи в конец таблицы "План" ---
     If taskIsNowComplete Then
-        rowData = targetRow.Range.Value
+        rowData = targetRow.Range.value
         targetRow.Delete
 
         firstGreenIndex = 0
         For i = 1 To tblPlan.ListRows.Count
-            If tblPlan.ListRows(i).Range.Interior.Color = RGB(204, 255, 204) Then
+            If tblPlan.ListRows(i).Range.Interior.color = RGB(204, 255, 204) Then
                 firstGreenIndex = i
                 Exit For
             End If
@@ -207,9 +202,9 @@ SkipUpdate:
             Set newRow = tblPlan.ListRows.Add(firstGreenIndex)
         End If
 
-        newRow.Range.Value = rowData
+        newRow.Range.value = rowData
         With newRow.Range
-            .Interior.Color = RGB(204, 255, 204)
+            .Interior.color = RGB(204, 255, 204)
         End With
     End If
 
@@ -218,3 +213,4 @@ ErrorHandler:
     If Err.Number <> 0 Then MsgBox "Возникла ошибка в Module2: " & Err.Description, vbCritical
 
 End Sub
+

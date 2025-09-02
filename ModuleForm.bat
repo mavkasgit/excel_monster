@@ -15,8 +15,34 @@ Private Const COL_LAMELI As Long = 16
 
 ' --- События ---
 Private Sub UserForm_Initialize()
+    ' --- Логика загрузки состояния чекбокса из Именованного Диапазона ---
+    Dim recordTimeSetting As Name
+    
+    On Error Resume Next
+    Set recordTimeSetting = ThisWorkbook.Names("RecordTimeSetting")
+    On Error GoTo 0
+
+    If recordTimeSetting Is Nothing Then
+        ' Имя не существует, создаем его со значением по умолчанию TRUE
+        ThisWorkbook.Names.Add Name:="RecordTimeSetting", RefersTo:="=TRUE"
+        Me.chkRecordTime.value = True
+    Else
+        ' Имя существует, считываем его значение
+        ' RefersTo возвращает строку "=TRUE" или "=FALSE", Evaluate преобразует ее в логическое значение
+        Me.chkRecordTime.value = Evaluate(recordTimeSetting.RefersTo)
+    End If
+
+    ' --- Основная логика ---
     Call PopulateList
 End Sub
+
+Private Sub chkRecordTime_Click()
+    ' Сохраняем состояние чекбокса в Именованный Диапазон
+    On Error Resume Next ' На случай если имя было удалено
+    ThisWorkbook.Names("RecordTimeSetting").RefersTo = "=" & UCase(CStr(Me.chkRecordTime.value))
+    On Error GoTo 0
+End Sub
+
 Private Sub cmdCancel_Click()
     Unload Me
 End Sub
@@ -35,7 +61,7 @@ Private Sub HandleTask(CloseAfter As Boolean)
     
     Dim selectedText As String
     Dim selectedIndex As Long
-    selectedText = Me.lstTasks.Value
+    selectedText = Me.lstTasks.value
     selectedIndex = Me.lstTasks.ListIndex
 
     If Left(selectedText, 3) = "---" Then Exit Sub
@@ -90,12 +116,12 @@ Public Sub PopulateList()
     End If
     
     For i = 2 To lastRow
-        Dim planValue As Variant: planValue = wsPlan.Cells(i, COL_PLAN).Value
-        Dim completedValue As Variant: completedValue = wsPlan.Cells(i, COL_COMPLETED).Value
+        Dim planValue As Variant: planValue = wsPlan.Cells(i, COL_PLAN).value
+        Dim completedValue As Variant: completedValue = wsPlan.Cells(i, COL_COMPLETED).value
         
         Dim isPriority As Boolean
         Dim priorityCheckValue As Variant
-        priorityCheckValue = wsPlan.Cells(i, COL_PRIORITY).Value
+        priorityCheckValue = wsPlan.Cells(i, COL_PRIORITY).value
         
         isPriority = False
         If IsNumeric(priorityCheckValue) Then
@@ -198,11 +224,11 @@ Private Function CreateTaskDisplayString(ByVal ws As Worksheet, ByVal rowIdx As 
     Dim parts As New Collection
     
     ' 1. Формируем первую часть (кол-во или *)
-    Dim planValue As Variant: planValue = ws.Cells(rowIdx, COL_PLAN).Value
+    Dim planValue As Variant: planValue = ws.Cells(rowIdx, COL_PLAN).value
     If CStr(planValue) = "*" Then
         parts.Add "*"
     Else
-        Dim completedValue As Variant: completedValue = ws.Cells(rowIdx, COL_COMPLETED).Value
+        Dim completedValue As Variant: completedValue = ws.Cells(rowIdx, COL_COMPLETED).value
         Dim numPlan As Long, numCompleted As Long
         If IsNumeric(planValue) Then numPlan = CLng(planValue)
         numCompleted = GetCompletedCount(completedValue)
@@ -215,22 +241,22 @@ Private Function CreateTaskDisplayString(ByVal ws As Worksheet, ByVal rowIdx As 
     End If
 
     ' 2. Добавляем остальные части, только если они не пустые
-    Dim material As String: material = Trim(CStr(ws.Cells(rowIdx, COL_MATERIAL).Value))
+    Dim material As String: material = Trim(CStr(ws.Cells(rowIdx, COL_MATERIAL).value))
     If material <> "" Then parts.Add material
     
-    Dim kpz As String: kpz = Trim(CStr(ws.Cells(rowIdx, COL_KPZ).Value))
+    Dim kpz As String: kpz = Trim(CStr(ws.Cells(rowIdx, COL_KPZ).value))
     If kpz <> "" Then parts.Add kpz
     
-    Dim customer As String: customer = Trim(CStr(ws.Cells(rowIdx, COL_CUSTOMER).Value))
+    Dim customer As String: customer = Trim(CStr(ws.Cells(rowIdx, COL_CUSTOMER).value))
     If customer <> "" Then parts.Add customer
     
-    Dim profile As String: profile = Trim(CStr(ws.Cells(rowIdx, COL_PROFILE).Value))
+    Dim profile As String: profile = Trim(CStr(ws.Cells(rowIdx, COL_PROFILE).value))
     If profile <> "" Then parts.Add profile
     
-    Dim color As String: color = Trim(CStr(ws.Cells(rowIdx, COL_COLOR).Value))
+    Dim color As String: color = Trim(CStr(ws.Cells(rowIdx, COL_COLOR).value))
     If color <> "" Then parts.Add color
     
-    Dim lameli As String: lameli = Trim(CStr(ws.Cells(rowIdx, COL_LAMELI).Value))
+    Dim lameli As String: lameli = Trim(CStr(ws.Cells(rowIdx, COL_LAMELI).value))
     If lameli <> "" Then parts.Add lameli & " шт."
     
     ' 3. Собираем все части в одну строку с помощью Join
@@ -244,3 +270,4 @@ Private Function CreateTaskDisplayString(ByVal ws As Worksheet, ByVal rowIdx As 
         CreateTaskDisplayString = Join(arr, " - ")
     End If
 End Function
+
