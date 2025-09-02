@@ -108,7 +108,7 @@ Public Sub PopulateList()
         Else
             Dim numPlan As Long, numCompleted As Long
             If IsNumeric(planValue) Then numPlan = CLng(planValue)
-            If IsNumeric(completedValue) Then numCompleted = CLng(completedValue)
+            numCompleted = GetCompletedCount(completedValue)
             remaining = numPlan - numCompleted
         End If
         
@@ -156,6 +156,17 @@ Public Sub PopulateList()
     End If
 End Sub
 
+' --- Вспомогательная функция для парсинга количества выполненных ---
+Private Function GetCompletedCount(ByVal cellValue As Variant) As Long
+    Dim parenPos As Integer
+    parenPos = InStr(CStr(cellValue), "(")
+    
+    If parenPos > 0 Then
+        GetCompletedCount = Val(Left(CStr(cellValue), parenPos - 1))
+    Else
+        GetCompletedCount = Val(cellValue)
+    End If
+End Function
 
 ' --- Вспомогательная функция поиска ---
 Private Function FindRowByText(ByVal textToFind As String) As Long
@@ -194,7 +205,7 @@ Private Function CreateTaskDisplayString(ByVal ws As Worksheet, ByVal rowIdx As 
         Dim completedValue As Variant: completedValue = ws.Cells(rowIdx, COL_COMPLETED).Value
         Dim numPlan As Long, numCompleted As Long
         If IsNumeric(planValue) Then numPlan = CLng(planValue)
-        If IsNumeric(completedValue) Then numCompleted = CLng(completedValue)
+        numCompleted = GetCompletedCount(completedValue)
         Dim remaining As Long: remaining = numPlan - numCompleted
         
         ' Пропускаем строку, если задача выполнена (на всякий случай)
