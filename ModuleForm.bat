@@ -13,19 +13,6 @@ Private Const COL_KPZ As Long = 7
 Private Const COL_COLOR As Long = 13
 Private Const COL_LAMELI As Long = 16
 
-Private Sub lblTotal_Click()
-
-End Sub
-
-Private Sub lstTasks_Click()
-
-End Sub
-
-
-Private Sub UserForm_Click()
-
-End Sub
-
 ' --- События ---
 Private Sub UserForm_Initialize()
     ' --- Логика загрузки состояния чекбокса из Именованного Диапазона ---
