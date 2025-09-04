@@ -1,8 +1,8 @@
 Option Explicit
 
-' --- ÊÎÄ Ñ ÓËÓ×ØÅÍÈßÌÈ: ÑÓÌÌÀ ÏÎÄÂÅÑÎÂ È ×ÈÑÒÎÅ ÔÎÐÌÀÒÈÐÎÂÀÍÈÅ ---
+' --- КОД С УЛУЧШЕНИЯМИ: СУММА ПОДВЕСОВ И ЧИСТОЕ ФОРМАТИРОВАНИЕ ---
 
-' === Êîíñòàíòû ===
+' === Константы ===
 Private Const COL_PLAN As Long = 1
 Private Const COL_PRIORITY As Long = 2
 Private Const COL_COMPLETED As Long = 3
@@ -26,9 +26,9 @@ Private Sub UserForm_Click()
 
 End Sub
 
-' --- Ñîáûòèÿ ---
+' --- События ---
 Private Sub UserForm_Initialize()
-    ' --- Ëîãèêà çàãðóçêè ñîñòîÿíèÿ ÷åêáîêñà èç Èìåíîâàííîãî Äèàïàçîíà ---
+    ' --- Логика загрузки состояния чекбокса из Именованного Диапазона ---
     Dim recordTimeSetting As Name
     
     On Error Resume Next
@@ -36,22 +36,22 @@ Private Sub UserForm_Initialize()
     On Error GoTo 0
 
     If recordTimeSetting Is Nothing Then
-        ' Èìÿ íå ñóùåñòâóåò, ñîçäàåì åãî ñî çíà÷åíèåì ïî óìîë÷àíèþ TRUE
+        ' Имя не существует, создаем его со значением по умолчанию TRUE
         ThisWorkbook.Names.Add Name:="RecordTimeSetting", RefersTo:="=TRUE"
         Me.chkRecordTime.value = True
     Else
-        ' Èìÿ ñóùåñòâóåò, ñ÷èòûâàåì åãî çíà÷åíèå
-        ' RefersTo âîçâðàùàåò ñòðîêó "=TRUE" èëè "=FALSE", Evaluate ïðåîáðàçóåò åå â ëîãè÷åñêîå çíà÷åíèå
+        ' Имя существует, считываем его значение
+        ' RefersTo возвращает строку "=TRUE" или "=FALSE", Evaluate преобразует ее в логическое значение
         Me.chkRecordTime.value = Evaluate(recordTimeSetting.RefersTo)
     End If
 
-    ' --- Îñíîâíàÿ ëîãèêà ---
+    ' --- Основная логика ---
     Call PopulateList
 End Sub
 
 Private Sub chkRecordTime_Click()
-    ' Ñîõðàíÿåì ñîñòîÿíèå ÷åêáîêñà â Èìåíîâàííûé Äèàïàçîí
-    On Error Resume Next ' Íà ñëó÷àé åñëè èìÿ áûëî óäàëåíî
+    ' Сохраняем состояние чекбокса в Именованный Диапазон
+    On Error Resume Next ' На случай если имя было удалено
     ThisWorkbook.Names("RecordTimeSetting").RefersTo = "=" & UCase(CStr(Me.chkRecordTime.value))
     On Error GoTo 0
 End Sub
@@ -60,7 +60,7 @@ Private Sub cmdCancel_Click()
     Unload Me
 End Sub
 
-' --- Êíîïêè ---
+' --- Кнопки ---
 Private Sub cmdAddTask_Click()
     Call HandleTask(CloseAfter:=False)
 End Sub
@@ -68,36 +68,36 @@ Private Sub cmdAddAndClose_Click()
     Call HandleTask(CloseAfter:=True)
 End Sub
 
-' --- Ëîãèêà îáðàáîòêè êëèêà ---
+' --- Логика обработки клика ---
 Private Sub HandleTask(CloseAfter As Boolean)
     If Me.lstTasks.ListIndex = -1 Then Exit Sub
     
     Dim selectedText As String
-    selectedText = Me.lstTasks.value ' Çàïîìèíàåì òåêñò ÄÎ âñåõ èçìåíåíèé
+    selectedText = Me.lstTasks.value ' Запоминаем текст ДО всех изменений
 
     If Left(selectedText, 3) = "---" Then Exit Sub
     
-    ' --- ÍÎÂÀß ÓËÓ×ØÅÍÍÀß ËÎÃÈÊÀ ---
+    ' --- НОВАЯ УЛУЧШЕННАЯ ЛОГИКА ---
     
-    ' 1. Èçâëåêàåì "ñòàáèëüíóþ" ÷àñòü òåêñòà çàäà÷è, êîòîðàÿ íå ìåíÿåòñÿ.
-    '    Ýòî áóäåò íàø "ÿêîðü" äëÿ ïîèñêà ïîñëå âñåõ ïåðåìåùåíèé.
+    ' 1. Извлекаем "стабильную" часть текста задачи, которая не меняется.
+    '    Это будет наш "якорь" для поиска после всех перемещений.
     Dim stableIdentifier As String
     Dim separatorPos As Long
     separatorPos = InStr(selectedText, " - ")
     
     If separatorPos > 0 Then
-        stableIdentifier = Mid(selectedText, separatorPos) ' Ïîëó÷àåì " - KPZ123 - Çàêàç÷èê..."
+        stableIdentifier = Mid(selectedText, separatorPos) ' Получаем " - KPZ123 - Заказчик..."
     Else
-        stableIdentifier = selectedText ' Íà ñëó÷àé, åñëè â ñòðîêå íåò äåôèñà (íàïðèìåð, òîëüêî "*")
+        stableIdentifier = selectedText ' На случай, если в строке нет дефиса (например, только "*")
     End If
 
-    ' 2. Íàõîäèì ïåðâîíà÷àëüíûé íîìåð ñòðîêè, ÷òîáû ïåðåäàòü åãî â ExecuteTask
+    ' 2. Находим первоначальный номер строки, чтобы передать его в ExecuteTask
     Dim initialRowIndex As Long
     initialRowIndex = FindRowByText(selectedText)
     
     If initialRowIndex > 0 Then
-        ' 3. Âûïîëíÿåì çàäà÷ó. Â ÝÒÎÒ ÌÎÌÅÍÒ ÑÒÐÎÊÀ ÏÅÐÅÌÅÙÀÅÒÑß,
-        '    è initialRowIndex ñòàíîâèòñÿ íåàêòóàëüíûì!
+        ' 3. Выполняем задачу. В ЭТОТ МОМЕНТ СТРОКА ПЕРЕМЕЩАЕТСЯ,
+        '    и initialRowIndex становится неактуальным!
         Call ExecuteTask(initialRowIndex)
         
         If CloseAfter Then
@@ -105,41 +105,41 @@ Private Sub HandleTask(CloseAfter As Boolean)
             Exit Sub
         End If
 
-        ' Ïåðåçàãðóæàåì ñïèñîê ñ ó÷åòîì âñåõ èçìåíåíèé íà ëèñòå
+        ' Перезагружаем список с учетом всех изменений на листе
         Call PopulateList
 
-        ' 4. ÈÙÅÌ ÇÀÄÀ×Ó Â ÍÎÂÎÌ ÑÏÈÑÊÅ ÏÎ ÑÒÀÁÈËÜÍÎÌÓ ÈÄÅÍÒÈÔÈÊÀÒÎÐÓ
+        ' 4. ИЩЕМ ЗАДАЧУ В НОВОМ СПИСКЕ ПО СТАБИЛЬНОМУ ИДЕНТИФИКАТОРУ
         Dim i As Long
         Dim isFound As Boolean
         isFound = False
         
         For i = 0 To Me.lstTasks.ListCount - 1
-            ' Ìû èùåì ñòðîêó, êîòîðàÿ ÇÀÊÀÍ×ÈÂÀÅÒÑß íà íàø "ÿêîðü".
-            ' Ýòî ñðàáîòàåò, äàæå åñëè êîëè÷åñòâî â íà÷àëå èçìåíèëîñü (ñ 10Ï íà 9Ï).
-            ' Èñïîëüçóåì CStr äëÿ íàäåæíîñòè, åñëè â ñïèñêå îêàæåòñÿ íå òåêñòîâîå çíà÷åíèå.
+            ' Мы ищем строку, которая ЗАКАНЧИВАЕТСЯ на наш "якорь".
+            ' Это сработает, даже если количество в начале изменилось (с 10П на 9П).
+            ' Используем CStr для надежности, если в списке окажется не текстовое значение.
             If InStr(CStr(Me.lstTasks.List(i)), stableIdentifier) > 0 Then
-                Me.lstTasks.ListIndex = i ' Íàøëè! Âûäåëÿåì.
+                Me.lstTasks.ListIndex = i ' Нашли! Выделяем.
                 isFound = True
-                Exit For ' Âûõîäèì, ò.ê. çàäà÷à íàéäåíà
+                Exit For ' Выходим, т.к. задача найдена
             End If
         Next i
         
-        ' 5. Åñëè ïîñëå öèêëà çàäà÷à íå íàéäåíà, çíà÷èò, îíà áûëà ïîñëåäíåé è çàâåðøèëàñü.
+        ' 5. Если после цикла задача не найдена, значит, она была последней и завершилась.
         If Not isFound Then
-            MsgBox "Çàäà÷à '" & selectedText & "' ïîëíîñòüþ âûïîëíåíà è óáðàíà èç ñïèñêà.", vbInformation, "Çàäà÷à çàâåðøåíà"
-            ' Îïöèîíàëüíî: âûäåëèòü ïåðâóþ çàäà÷ó â ñïèñêå, ÷òîáû ôîêóñ íå ïðîïàäàë
+            MsgBox "Задача '" & selectedText & "' полностью выполнена и убрана из списка.", vbInformation, "Задача завершена"
+            ' Опционально: выделить первую задачу в списке, чтобы фокус не пропадал
             If Me.lstTasks.ListCount > 0 Then Me.lstTasks.ListIndex = 0
         End If
         
         Me.lstTasks.SetFocus
         
     Else
-        ' Ýòà îøèáêà ìîæåò âîçíèêíóòü, åñëè äàííûå íà ëèñòå èçìåíèëèñü ìåæäó PopulateList è êëèêîì
-        MsgBox "Íå óäàëîñü íàéòè èñõîäíóþ ñòðîêó íà ëèñòå: '" & selectedText & "'. Ñïèñîê áóäåò îáíîâëåí.", vbExclamation
+        ' Эта ошибка может возникнуть, если данные на листе изменились между PopulateList и кликом
+        MsgBox "Не удалось найти исходную строку на листе: '" & selectedText & "'. Список будет обновлен.", vbExclamation
         Call PopulateList
     End If
 End Sub
-' --- Îñíîâíàÿ ïðîöåäóðà îòîáðàæåíèÿ ---
+' --- Основная процедура отображения ---
 Public Sub PopulateList()
     Dim wsPlan As Worksheet
     Dim lastRow As Long
@@ -147,11 +147,11 @@ Public Sub PopulateList()
     
     Dim priorityTasks As New Collection
     Dim standardTasks As New Collection
-    Dim totalHangersSum As Double ' ÈÇÌÅÍÅÍÈÅ 2: Ïåðåìåííàÿ äëÿ ñóììû ïîäâåñîâ
+    Dim totalHangersSum As Double ' ИЗМЕНЕНИЕ 2: Переменная для суммы подвесов
     
     On Error GoTo 0
 
-    Set wsPlan = ThisWorkbook.Sheets("Ïëàí")
+    Set wsPlan = ThisWorkbook.Sheets("План")
     lastRow = wsPlan.Cells(wsPlan.Rows.Count, COL_PLAN).End(xlUp).Row
 
     Me.lstTasks.Clear
@@ -159,7 +159,7 @@ Public Sub PopulateList()
     Me.lstTasks.ColumnWidths = "700"
     
     If lastRow < 2 Then
-        Me.lstTasks.AddItem "Íà ëèñòå 'Ïëàí' íåò äàííûõ."
+        Me.lstTasks.AddItem "На листе 'План' нет данных."
         Exit Sub
     End If
     
@@ -187,12 +187,12 @@ Public Sub PopulateList()
         End If
         
         If remaining > 0 Then
-            ' ÈÇÌÅÍÅÍÈÅ 2: Ñóììèðóåì ïîäâåñû òîëüêî äëÿ ÷èñëîâûõ çàäà÷
+            ' ИЗМЕНЕНИЕ 2: Суммируем подвесы только для числовых задач
             If CStr(planValue) <> "*" Then
                 totalHangersSum = totalHangersSum + remaining
             End If
             
-            ' ÈÇÌÅÍÅÍÈÅ 3: Èñïîëüçóåì íîâóþ ôóíêöèþ äëÿ ÷èñòîãî ôîðìàòèðîâàíèÿ ñòðîêè
+            ' ИЗМЕНЕНИЕ 3: Используем новую функцию для чистого форматирования строки
             Dim displayText As String
             displayText = CreateTaskDisplayString(wsPlan, i)
             
@@ -209,9 +209,9 @@ Public Sub PopulateList()
         Me.lstTasks.AddItem item
     Next item
     
-    ' ÈÇÌÅÍÅÍÈÅ 1: Ýòà ëîãèêà óæå âåðíà. Ðàçäåëèòåëü ïîÿâèòñÿ, òîëüêî åñëè åñòü ÎÁÀ òèïà çàäà÷.
+    ' ИЗМЕНЕНИЕ 1: Эта логика уже верна. Разделитель появится, только если есть ОБА типа задач.
     If priorityTasks.Count > 0 And standardTasks.Count > 0 Then
-        Me.lstTasks.AddItem "--- ÑÐÎ×ÍÎ --- ÑÐÎ×ÍÎ --- ÑÐÎ×ÍÎ --- ÑÐÎ×ÍÎ ---"
+        Me.lstTasks.AddItem "--- СРОЧНО --- СРОЧНО --- СРОЧНО --- СРОЧНО ---"
     End If
     
     For Each item In standardTasks
@@ -222,15 +222,15 @@ Public Sub PopulateList()
     totalTasks = priorityTasks.Count + standardTasks.Count
     
     If totalTasks = 0 Then
-        Me.lstTasks.AddItem "Âñå çàäà÷è âûïîëíåíû."
-        Me.Controls("lblTotal").Caption = "Îáùåå êîë-âî ïîäâåñîâ: 0"
+        Me.lstTasks.AddItem "Все задачи выполнены."
+        Me.Controls("lblTotal").Caption = "Общее кол-во подвесов: 0"
     Else
-        ' ÈÇÌÅÍÅÍÈÅ 2: Îáíîâëÿåì íàäïèñü, ÷òîáû ïîêàçûâàòü ñóììó ïîäâåñîâ
-        Me.Controls("lblTotal").Caption = "Îáùåå êîë-âî ïîäâåñîâ: " & totalHangersSum
+        ' ИЗМЕНЕНИЕ 2: Обновляем надпись, чтобы показывать сумму подвесов
+        Me.Controls("lblTotal").Caption = "Общее кол-во подвесов: " & totalHangersSum
     End If
 End Sub
 
-' --- Âñïîìîãàòåëüíàÿ ôóíêöèÿ äëÿ ïàðñèíãà êîëè÷åñòâà âûïîëíåííûõ ---
+' --- Вспомогательная функция для парсинга количества выполненных ---
 Private Function GetCompletedCount(ByVal cellValue As Variant) As Long
     Dim parenPos As Integer
     parenPos = InStr(CStr(cellValue), "(")
@@ -242,19 +242,19 @@ Private Function GetCompletedCount(ByVal cellValue As Variant) As Long
     End If
 End Function
 
-' --- Âñïîìîãàòåëüíàÿ ôóíêöèÿ ïîèñêà ---
+' --- Вспомогательная функция поиска ---
 Private Function FindRowByText(ByVal textToFind As String) As Long
     Dim wsPlan As Worksheet
     Dim lastRow As Long
     Dim i As Long
     
-    Set wsPlan = ThisWorkbook.Sheets("Ïëàí")
+    Set wsPlan = ThisWorkbook.Sheets("План")
     lastRow = wsPlan.Cells(wsPlan.Rows.Count, COL_PLAN).End(xlUp).Row
     
     If lastRow < 2 Then Exit Function
     
     For i = 2 To lastRow
-        ' ÈÇÌÅÍÅÍÈÅ 3: Çäåñü òîæå èñïîëüçóåì íîâóþ ôóíêöèþ, ÷òîáû ñòðîêè òî÷íî ñîâïàëè
+        ' ИЗМЕНЕНИЕ 3: Здесь тоже используем новую функцию, чтобы строки точно совпали
         Dim currentText As String
         currentText = CreateTaskDisplayString(wsPlan, i)
         
@@ -266,12 +266,12 @@ Private Function FindRowByText(ByVal textToFind As String) As Long
 End Function
 
 
-' --- ÍÎÂÀß ÂÑÏÎÌÎÃÀÒÅËÜÍÀß ÔÓÍÊÖÈß äëÿ ÷èñòîãî ôîðìàòèðîâàíèÿ ñòðîêè ---
+' --- НОВАЯ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ для чистого форматирования строки ---
 Private Function CreateTaskDisplayString(ByVal ws As Worksheet, ByVal rowIdx As Long) As String
-    ' Ýòà ôóíêöèÿ ñîáèðàåò ñòðîêó äëÿ îòîáðàæåíèÿ, ïðîïóñêàÿ ïóñòûå ÿ÷åéêè.
+    ' Эта функция собирает строку для отображения, пропуская пустые ячейки.
     Dim parts As New Collection
     
-    ' 1. Ôîðìèðóåì ïåðâóþ ÷àñòü (êîë-âî èëè *)
+    ' 1. Формируем первую часть (кол-во или *)
     Dim planValue As Variant: planValue = ws.Cells(rowIdx, COL_PLAN).value
     If CStr(planValue) = "*" Then
         parts.Add "*"
@@ -282,13 +282,13 @@ Private Function CreateTaskDisplayString(ByVal ws As Worksheet, ByVal rowIdx As 
         numCompleted = GetCompletedCount(completedValue)
         Dim remaining As Long: remaining = numPlan - numCompleted
         
-        ' Ïðîïóñêàåì ñòðîêó, åñëè çàäà÷à âûïîëíåíà (íà âñÿêèé ñëó÷àé)
+        ' Пропускаем строку, если задача выполнена (на всякий случай)
         If remaining <= 0 Then Exit Function
         
-        parts.Add remaining & "Ï"
+        parts.Add remaining & "П"
     End If
 
-    ' 2. Äîáàâëÿåì îñòàëüíûå ÷àñòè, òîëüêî åñëè îíè íå ïóñòûå
+    ' 2. Добавляем остальные части, только если они не пустые
     Dim material As String: material = Trim(CStr(ws.Cells(rowIdx, COL_MATERIAL).value))
     If material <> "" Then parts.Add material
     
@@ -305,9 +305,9 @@ Private Function CreateTaskDisplayString(ByVal ws As Worksheet, ByVal rowIdx As 
     If color <> "" Then parts.Add color
     
     Dim lameli As String: lameli = Trim(CStr(ws.Cells(rowIdx, COL_LAMELI).value))
-    If lameli <> "" Then parts.Add lameli & " øò."
+    If lameli <> "" Then parts.Add lameli & " шт."
     
-    ' 3. Ñîáèðàåì âñå ÷àñòè â îäíó ñòðîêó ñ ïîìîùüþ Join
+    ' 3. Собираем все части в одну строку с помощью Join
     If parts.Count > 0 Then
         Dim arr() As String
         ReDim arr(1 To parts.Count)
