@@ -171,18 +171,22 @@ Public Sub PopulateList()
     Dim lastRow As Long
     Dim i As Long
     
-    ' Три коллекции для трех типов задач
+    ' Collections for tasks
     Dim inProgressTasks As New Collection
     Dim priorityTasks As New Collection
     Dim standardTasks As New Collection
+    
+    ' Variables for summaries
     Dim totalHangersSum As Double
+    Dim colorSums As Object
+    Set colorSums = CreateObject("Scripting.Dictionary")
     
     On Error GoTo 0
 
     Set wsPlan = ThisWorkbook.Sheets("План")
     lastRow = wsPlan.Cells(wsPlan.Rows.Count, COL_PLAN).End(xlUp).Row
 
-    ' Очищаем оба списка
+    ' Clear lists
     Me.lstTasks.Clear
     Me.lstInProgressTasks.Clear
     Me.lstTasks.ColumnCount = 1
@@ -195,13 +199,14 @@ Public Sub PopulateList()
         Exit Sub
     End If
     
+    ' --- Main loop to process tasks ---
     For i = 2 To lastRow
         Dim planValue As Variant: planValue = wsPlan.Cells(i, COL_PLAN).value
         Dim completedValue As Variant: completedValue = wsPlan.Cells(i, COL_COMPLETED).value
         
         Dim numPlan As Long, numCompleted As Long
         If CStr(planValue) = "*" Then
-            numPlan = 999999 ' Условное большое число для задач "*"
+            numPlan = 999999
         Else
             If IsNumeric(planValue) Then numPlan = CLng(planValue)
         End If
@@ -211,11 +216,23 @@ Public Sub PopulateList()
         remaining = numPlan - numCompleted
         
         If remaining > 0 Then
+            ' --- Aggregation logic ---
             If CStr(planValue) <> "*" Then
                 totalHangersSum = totalHangersSum + remaining
+                
+                ' Sum by color
+                Dim color As String
+                color = Trim(CStr(wsPlan.Cells(i, COL_COLOR).value))
+                If color = "" Then color = "Без цвета"
+                
+                If colorSums.Exists(color) Then
+                    colorSums(color) = colorSums(color) + remaining
+                Else
+                    colorSums(color) = remaining
+                End If
             End If
             
-            ' --- Determine priority FIRST ---
+            ' --- Determine priority ---
             Dim isPriority As Boolean
             Dim priorityCheckValue As Variant
             priorityCheckValue = wsPlan.Cells(i, COL_PRIORITY).value
@@ -244,9 +261,10 @@ Public Sub PopulateList()
         End If
     Next i
 
+    ' --- Populate ListBoxes ---
     Dim item As Variant
     
-    ' --- Заполняем список "В работе" ---
+    ' "In Progress" list
     If inProgressTasks.Count > 0 Then
         For Each item In inProgressTasks
             Me.lstInProgressTasks.AddItem item
@@ -255,13 +273,11 @@ Public Sub PopulateList()
         Me.lstInProgressTasks.AddItem "Нет начатых задач."
     End If
 
-    ' --- Заполняем список "Ожидают" ---
+    ' "Waiting" list
     If priorityTasks.Count > 0 Or standardTasks.Count > 0 Then
         For Each item In priorityTasks
             Me.lstTasks.AddItem item
         Next item
-        
-        ' SEPARATOR REMOVED
         
         For Each item In standardTasks
             Me.lstTasks.AddItem item
@@ -270,14 +286,57 @@ Public Sub PopulateList()
          Me.lstTasks.AddItem "Нет задач в ожидании."
     End If
 
-
+    ' --- Update Total Summary Label ---
     Dim totalTasks As Long
     totalTasks = inProgressTasks.Count + priorityTasks.Count + standardTasks.Count
     
     If totalTasks = 0 Then
         Me.Controls("lblTotal").Caption = "Общее кол-во подвесов: 0"
     Else
-        Me.Controls("lblTotal").Caption = "Общее кол-во подвесов: " & totalHangersSum
+        ' Build the detailed summary string
+        Dim summaryText As String
+        summaryText = "Общее кол-во подвесов: " & totalHangersSum
+        
+        If colorSums.Count > 0 Then
+            summaryText = summaryText & vbCrLf & "--------------------"
+
+            ' --- NEW SORTING LOGIC ---
+            ' 1. Move dictionary to a 2D array for sorting
+            Dim colorArray() As Variant
+            ReDim colorArray(1 To colorSums.Count, 1 To 2) ' Col 1: Color, Col 2: Count
+            Dim j As Long ' j is used for sorting
+            Dim key As Variant
+            i = 1 ' Reset i for this loop
+            For Each key In colorSums.Keys
+                colorArray(i, 1) = key
+                colorArray(i, 2) = colorSums(key)
+                i = i + 1
+            Next key
+
+            ' 2. Simple Bubble Sort (descending) on the array by count (column 2)
+            Dim tempColor As Variant, tempCount As Variant
+            For i = 1 To colorSums.Count - 1
+                For j = i + 1 To colorSums.Count
+                    If colorArray(i, 2) < colorArray(j, 2) Then
+                        ' Swap rows
+                        tempColor = colorArray(i, 1)
+                        tempCount = colorArray(i, 2)
+                        colorArray(i, 1) = colorArray(j, 1)
+                        colorArray(i, 2) = colorArray(j, 2)
+                        colorArray(j, 1) = tempColor
+                        colorArray(j, 2) = tempCount
+                    End If
+                Next j
+            Next i
+
+            ' 3. Add sorted items to the summary string
+            For i = 1 To colorSums.Count
+                summaryText = summaryText & vbCrLf & colorArray(i, 1) & ": " & colorArray(i, 2) & " шт."
+            Next i
+            ' --- END SORTING LOGIC ---
+        End If
+
+        Me.Controls("lblTotal").Caption = summaryText
     End If
 End Sub
 
