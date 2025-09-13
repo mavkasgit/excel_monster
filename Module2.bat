@@ -7,8 +7,69 @@ Private Const PODVESY_SHEET As String = "Подвесы"
 Private Const PLAN_TABLE As String = "tblPlan"
 
 Sub ShowTaskForm()
+    If Not IsLastRowValid() Then
+        Exit Sub ' Don't show the form if validation fails
+    End If
     Form1.Show
 End Sub
+
+Public Function IsLastRowValid() As Boolean
+    IsLastRowValid = True ' Assume valid by default
+    Dim lastRowByDate As Long
+    Dim trueLastRow As Long
+    Dim wsPodvesy As Worksheet
+    
+    On Error GoTo ValidationFailed
+
+    Set wsPodvesy = ThisWorkbook.Sheets("Подвесы")
+    
+    ' Find last row based on Date column (D)
+    lastRowByDate = wsPodvesy.Cells(wsPodvesy.Rows.Count, "D").End(xlUp).Row
+    
+    ' Find the very last used row on the sheet
+    If Application.WorksheetFunction.CountA(wsPodvesy.Cells) > 0 Then
+        trueLastRow = wsPodvesy.Cells.Find(What:="*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
+    Else
+        trueLastRow = 0 ' Sheet is blank
+    End If
+
+    ' CHECK 1: Stray data check
+    If trueLastRow > lastRowByDate Then
+        MsgBox "Обнаружены данные в строке " & trueLastRow & " без указания даты в столбце D. " & _
+               "Это приведет к перезаписи данных. Пожалуйста, укажите дату в этой строке или полностью удалите ее.", vbCritical, "Ошибка данных"
+        IsLastRowValid = False
+        Exit Function
+    End If
+
+    ' CHECK 2: Incomplete row check (the existing check on the last row with a date)
+    If lastRowByDate < 2 Then Exit Function ' No data rows to check
+    
+    Dim valG As String, valH As String, valR As String
+    valG = Trim(CStr(wsPodvesy.Cells(lastRowByDate, 7).value))
+    valH = Trim(CStr(wsPodvesy.Cells(lastRowByDate, 8).value))
+    valR = Trim(CStr(wsPodvesy.Cells(lastRowByDate, 18).value))
+
+    If valG = "" Or valH = "" Or valR = "" Then
+        MsgBox "В строке " & lastRowByDate & " на листе 'Подвесы' не заполнены все необходимые ячейки (G, H или R). Пожалуйста, заполните их корректно или полностью очистите строку.", vbCritical, "Ошибка данных"
+        IsLastRowValid = False
+    End If
+    
+    Exit Function
+
+ValidationFailed:
+    Dim errorMsg As String
+    errorMsg = "Произошла ошибка при проверке листа 'Подвесы'."
+    Dim errorRow As Long
+    On Error Resume Next
+    errorRow = wsPodvesy.Cells.Find(What:="*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).Row
+    On Error GoTo 0
+    If errorRow > 0 Then
+         errorMsg = "Произошла ошибка при чтении строки " & errorRow & " на листе 'Подвесы'."
+    End If
+
+    MsgBox errorMsg & vbCrLf & "Описание: " & Err.Description, vbCritical, "Ошибка проверки"
+    IsLastRowValid = False
+End Function
 
 Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
     ' Объявление всех переменных в начале процедуры
@@ -213,4 +274,3 @@ ErrorHandler:
     If Err.Number <> 0 Then MsgBox "Возникла ошибка в Module2: " & Err.Description, vbCritical
 
 End Sub
-
