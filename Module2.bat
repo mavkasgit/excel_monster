@@ -71,7 +71,7 @@ ValidationFailed:
     IsLastRowValid = False
 End Function
 
-Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
+Public Function ExecuteTask(ByVal sheetRowIndex As Long) As Boolean
     ' Объявление всех переменных в начале процедуры
     Dim wsPlan As Worksheet, wsPodvesy As Worksheet
     Dim tblPlan As ListObject
@@ -83,6 +83,7 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
     Dim i As Long
     Const quantity As Long = 1
 
+    taskIsNowComplete = False ' Initialize
     On Error GoTo ErrorHandler
     Application.ScreenUpdating = False
 
@@ -129,7 +130,6 @@ Public Sub ExecuteTask(ByVal sheetRowIndex As Long)
     If targetRow Is Nothing Then GoTo ErrorHandler
 
     ' --- 1. Обновление данных в таблице "План" ---
-    taskIsNowComplete = False
     currentPlanned = targetRow.Range.Cells(1, 1).value
 
     If CStr(currentPlanned) <> "*" Then
@@ -269,8 +269,13 @@ SkipUpdate:
         End With
     End If
 
+    ExecuteTask = taskIsNowComplete
+    Application.ScreenUpdating = True
+    Exit Function
+
 ErrorHandler:
+    ExecuteTask = False
     Application.ScreenUpdating = True
     If Err.Number <> 0 Then MsgBox "Возникла ошибка в Module2: " & Err.Description, vbCritical
 
-End Sub
+End Function

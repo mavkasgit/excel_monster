@@ -101,47 +101,60 @@ Private Sub HandleTask(CloseAfter As Boolean)
     initialRowIndex = FindRowByText(selectedText)
     
     If initialRowIndex > 0 Then
-        Call ExecuteTask(initialRowIndex)
+        Dim wasTaskCompleted As Boolean
+        wasTaskCompleted = ExecuteTask(initialRowIndex) ' This is now a Function
+
+        If wasTaskCompleted Then
+            MsgBox "Задача '" & selectedText & "' полностью выполнена.", vbInformation, "Задача завершена"
+        End If
         
+        ' Now, decide what to do after the message
         If CloseAfter Then
             Unload Me
             Exit Sub
         End If
-
-        ' Перезагружаем оба списка
+        
+        ' If we are not closing, we need to refresh the list
         Call PopulateList
-
-        ' ИЩЕМ ЗАДАЧУ В ОБОИХ СПИСКАХ ПО СТАБИЛЬНОМУ ИДЕНТИФИКАТОРУ
-        Dim i As Long
-        Dim isFound As Boolean
-        isFound = False
         
-        ' Сначала ищем в списке "В работе"
-        For i = 0 To Me.lstInProgressTasks.ListCount - 1
-            If InStr(CStr(Me.lstInProgressTasks.List(i)), stableIdentifier) > 0 Then
-                Me.lstInProgressTasks.ListIndex = i
-                Set m_ActiveListBox = Me.lstInProgressTasks ' Делаем его активным
-                Me.lstTasks.ListIndex = -1 ' Сбрасываем другой
-                isFound = True
-                Exit For
-            End If
-        Next i
-        
-        ' Если не нашли, ищем в списке "Ожидают"
-        If Not isFound Then
-            For i = 0 To Me.lstTasks.ListCount - 1
-                If InStr(CStr(Me.lstTasks.List(i)), stableIdentifier) > 0 Then
-                    Me.lstTasks.ListIndex = i
-                    Set m_ActiveListBox = Me.lstTasks ' Делаем его активным
-                    Me.lstInProgressTasks.ListIndex = -1 ' Сбрасываем другой
+        ' And try to re-select the item if it wasn't completed
+        If Not wasTaskCompleted Then
+            Dim i As Long
+            Dim isFound As Boolean
+            isFound = False
+            
+            ' Сначала ищем в списке "В работе"
+            For i = 0 To Me.lstInProgressTasks.ListCount - 1
+                If InStr(CStr(Me.lstInProgressTasks.List(i)), stableIdentifier) > 0 Then
+                    Me.lstInProgressTasks.ListIndex = i
+                    Set m_ActiveListBox = Me.lstInProgressTasks ' Делаем его активным
+                    Me.lstTasks.ListIndex = -1 ' Сбрасываем другой
                     isFound = True
                     Exit For
                 End If
             Next i
-        End If
-        
-        If Not isFound Then
-            ' Задача, видимо, завершена
+            
+            ' Если не нашли, ищем в списке "Ожидают"
+            If Not isFound Then
+                For i = 0 To Me.lstTasks.ListCount - 1
+                    If InStr(CStr(Me.lstTasks.List(i)), stableIdentifier) > 0 Then
+                        Me.lstTasks.ListIndex = i
+                        Set m_ActiveListBox = Me.lstTasks ' Делаем его активным
+                        Me.lstInProgressTasks.ListIndex = -1 ' Сбрасываем другой
+                        isFound = True
+                        Exit For
+                    End If
+                Next i
+            End If
+        Else
+            ' The task is gone, maybe select the first item in one of the lists
+            If Me.lstInProgressTasks.ListCount > 0 Then
+                Me.lstInProgressTasks.ListIndex = 0
+                Set m_ActiveListBox = Me.lstInProgressTasks
+            ElseIf Me.lstTasks.ListCount > 0 Then
+                Me.lstTasks.ListIndex = 0
+                Set m_ActiveListBox = Me.lstTasks
+            End If
         End If
         
         m_ActiveListBox.SetFocus
@@ -202,24 +215,26 @@ Public Sub PopulateList()
                 totalHangersSum = totalHangersSum + remaining
             End If
             
+            ' --- Determine priority FIRST ---
+            Dim isPriority As Boolean
+            Dim priorityCheckValue As Variant
+            priorityCheckValue = wsPlan.Cells(i, COL_PRIORITY).value
+            isPriority = False
+            If IsNumeric(priorityCheckValue) Then
+                If CDbl(priorityCheckValue) > 0 Then isPriority = True
+            End If
+
+            ' --- Create display text ---
             Dim displayText As String
             displayText = CreateTaskDisplayString(wsPlan, i)
+            If isPriority Then
+                displayText = "СРОЧНО!!! " & displayText
+            End If
             
-            ' --- НОВАЯ ЛОГИКА РАСПРЕДЕЛЕНИЯ ---
+            ' --- Distribute to lists ---
             If numCompleted > 0 Then
-                ' Если задача уже начата, она идет в список "В работе"
                 inProgressTasks.Add displayText
             Else
-                ' Иначе, распределяем по приоритету
-                Dim isPriority As Boolean
-                Dim priorityCheckValue As Variant
-                priorityCheckValue = wsPlan.Cells(i, COL_PRIORITY).value
-                
-                isPriority = False
-                If IsNumeric(priorityCheckValue) Then
-                    If CDbl(priorityCheckValue) > 0 Then isPriority = True
-                End If
-                
                 If isPriority Then
                     priorityTasks.Add displayText
                 Else
@@ -246,9 +261,7 @@ Public Sub PopulateList()
             Me.lstTasks.AddItem item
         Next item
         
-        If priorityTasks.Count > 0 And standardTasks.Count > 0 Then
-            Me.lstTasks.AddItem "--- (обычные) ---"
-        End If
+        ' SEPARATOR REMOVED
         
         For Each item In standardTasks
             Me.lstTasks.AddItem item
@@ -291,12 +304,41 @@ Private Function FindRowByText(ByVal textToFind As String) As Long
     If lastRow < 2 Then Exit Function
     
     For i = 2 To lastRow
-        Dim currentText As String
-        currentText = CreateTaskDisplayString(wsPlan, i)
+        ' --- Replicate the logic from PopulateList ---
         
-        If currentText = textToFind Then
-            FindRowByText = i
-            Exit Function
+        ' 1. Check if the task should even be in the list
+        Dim planValue As Variant: planValue = wsPlan.Cells(i, COL_PLAN).value
+        Dim completedValue As Variant: completedValue = wsPlan.Cells(i, COL_COMPLETED).value
+        Dim numPlan As Long, numCompleted As Long
+        If CStr(planValue) = "*" Then
+            numPlan = 999999
+        Else
+            If IsNumeric(planValue) Then numPlan = CLng(planValue)
+        End If
+        numCompleted = GetCompletedCount(completedValue)
+        
+        If (numPlan - numCompleted) > 0 Then
+            ' 2. Determine priority
+            Dim isPriority As Boolean
+            Dim priorityCheckValue As Variant
+            priorityCheckValue = wsPlan.Cells(i, COL_PRIORITY).value
+            isPriority = False
+            If IsNumeric(priorityCheckValue) Then
+                If CDbl(priorityCheckValue) > 0 Then isPriority = True
+            End If
+
+            ' 3. Build the potential display text
+            Dim currentText As String
+            currentText = CreateTaskDisplayString(wsPlan, i)
+            If isPriority Then
+                currentText = "СРОЧНО!!! " & currentText
+            End If
+            
+            ' 4. Compare
+            If currentText = textToFind Then
+                FindRowByText = i
+                Exit Function
+            End If
         End If
     Next i
 End Function
