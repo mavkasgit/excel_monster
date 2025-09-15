@@ -1,0 +1,13 @@
+Option Explicit
+
+' Запускается автоматически при открытии книги.
+Private Sub Workbook_Open()
+    ' Отдает команду на запуск системы бэкапов.
+    InitializeBackupSystem
+End Sub
+
+' Запускается автоматически перед закрытием книги.
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+    ' Отдает команду на чистое завершение работы системы бэкапов.
+    ShutdownBackupSystem
+End Sub
